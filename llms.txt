@@ -76,4 +76,4 @@
 - [Handler needs the same env vars as the creation Lambda](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/spot-002.md): If the interruption handler auto-replaces instances, it needs the same broad environment variables as the server-creation Lambda.
 
 ## DynamoDB
-- [Backfill before deploying a changed read pattern](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/dynamodb-001-53.md): Switching a single-table listing from Scan to a sparse-GSI Query needs its backfill run first — new query code over un-migrated items returns a silent empty result (200, empty list) that looks like data loss but isn't.
+- [Design single-table access patterns up front](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/dynamodb-001-53.md): Single-table DynamoDB is access-pattern-first — model every read (including "list all X") and provision its GSI with the key stamped at write time; a listing that needs a Scan or a retrofitted+backfilled index is a design smell.

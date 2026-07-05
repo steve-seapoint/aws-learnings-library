@@ -1,39 +1,28 @@
 ---
 id: dynamodb-001-53
-title: Run the DynamoDB backfill BEFORE deploying code that changes a read pattern
-services: [DynamoDB, Lambda]
-summary: Switching a single-table listing from Scan to a sparse-GSI Query needs its backfill run first — new query code over un-migrated items returns a silent empty result (HTTP 200, empty list), which looks exactly like data loss but isn't.
+title: Design single-table DynamoDB access patterns (and their GSIs) up front
+services: [DynamoDB]
+summary: Single-table DynamoDB is access-pattern-first — enumerate every read (including "list all X") before modeling, and provision the GSI + stamp its key at write time. A listing that needs a Scan, or an index retrofitted onto live data, means the pattern was not designed in.
 ---
 
-# Run the DynamoDB backfill BEFORE deploying code that changes a read pattern
+# Design single-table DynamoDB access patterns (and their GSIs) up front
 
-**Problem:** After a routine deploy, a "list all X" view suddenly showed nothing — e.g. a UI reading "No items yet" — even though every record was still in the table. It looks like catastrophic data loss. It is not: the underlying items are intact; the *index the new code queries* is empty.
+**Problem:** A "list all X" view (a landing page listing every tenant/vault/account) is slow and expensive — or worse, a later "optimization" swaps the Scan for a Query against a new GSI, ships, and the list comes back **empty** (a silent 200 with no items) even though every record is intact. It reads like data loss. It isn't; the retrofitted index just wasn't populated for pre-existing items.
 
-**Root Cause:** The deploy changed a read pattern. In single-table DynamoDB, `PK=THING#{id}` puts each entity in its **own partition**, so "list all things" cannot be a Query on the base table (Query needs one partition key value) — the old code did a **Scan** with a filter (e.g. `SK=CONFIG`). The new code switched to the correct pattern: a **sparse / overloaded GSI** ("inverted index") — a shared synthetic partition key (`GSI1PK=REGISTRY`) stamped on each config item, so listing becomes one cheap Query. But that marker is only present on items that were **backfilled**. The migration that stamps `GSI1PK` onto pre-existing items was never run in the target environment, so the GSI partition was empty. A Query over an empty index returns a **successful 200 with an empty list — no error, no log** — the most deceptive failure mode. Rolling back the Lambda alias did **not** help: it is a data-shape mismatch, not a code regression.
+**Root Cause:** The table wasn't designed for that access pattern. In single-table design, `PK=THING#{id}` puts each entity in its **own partition**. A DynamoDB Query needs one partition-key value, so "enumerate all things across partitions" is **impossible on the base table** — it degrades to a full-table **Scan**. That Scan is the tell that a required read (collection listing) was never modeled. The usual "fix" then bolts on a **sparse / overloaded GSI** (an inverted index: a shared synthetic key like `GSI1PK=REGISTRY` on each config item, making the collection one cheap Query) — but retrofitting it onto live data needs a backfill, and shipping the Query before that backfill causes the silent-empty failure. All of it is avoidable by designing the pattern in.
 
-**Solution:** Run the idempotent backfill to stamp the GSI key onto existing items, then verify the GSI Query returns them.
+**Solution:** Design access patterns first, then the keys and indexes to serve them.
+1. **Enumerate every access pattern before modeling** — every read the app and its agents will make, including collection listings, filters, and sorts. This is the core single-table discipline (Rick Houlihan): you cannot key a table correctly without the full read list.
+2. **Give each listing a home partition from day one.** For "list all X," provision a sparse/overloaded GSI with a shared partition key and **stamp that key at write time**, in the same create/update path that writes the item:
 ```python
-# One-time, purely additive: stamp the sparse-GSI marker onto pre-existing items.
-# Idempotent — only touches items MISSING the marker; never mutates other attrs.
-from boto3.dynamodb.conditions import Attr
-kwargs = {"FilterExpression": Attr("SK").eq("CONFIG")
-          & Attr("PK").begins_with("THING#") & Attr("GSI1PK").not_exists()}
-while True:
-    resp = table.scan(**kwargs)
-    for it in resp["Items"]:
-        table.update_item(
-            Key={"PK": it["PK"], "SK": "CONFIG"},
-            UpdateExpression="SET GSI1PK = :pk, GSI1SK = :sk",
-            ConditionExpression=Attr("GSI1PK").not_exists(),   # idempotent
-            ExpressionAttributeValues={":pk": "REGISTRY", ":sk": it["PK"]})
-    if "LastEvaluatedKey" not in resp: break
-    kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+# At entity-create time — the index key is written WITH the item, never later.
+table.put_item(Item={
+    "PK": f"THING#{thing_id}", "SK": "CONFIG",
+    "GSI1PK": "REGISTRY", "GSI1SK": f"THING#{thing_id}",  # sparse listing index
+})
+# list_all_things() is then a Query, never a Scan:
+#   query(IndexName="GSI1", KeyConditionExpression=Key("GSI1PK").eq("REGISTRY"))
 ```
-Verify: `aws dynamodb query --index-name GSI1 --key-condition-expression "GSI1PK = :r" ...` returns the full set.
+3. **If you must add an index to an existing table, backfill BEFORE the query code ships** — stamp the key onto all existing items first (idempotent, additive), so the new Query never misses un-migrated rows. This is remediation, not the goal.
 
-**Prevention:**
-- **Migrations run BEFORE the code that depends on them.** Stamp-first means there is never a window where the new Query misses un-backfilled items. (Backfill scripts often say this in their own docstring — read it.)
-- **Pre-deploy checklist:** is the target env behind `main`, and does the delta include a schema/index migration or backfill? A "small fix" deploy can silently drag in someone else's unmigrated read-pattern change.
-- **A failed read that returns empty is worse than one that errors** — the outage is invisible until a human looks. Add a smoke check after any index/GSI change: does the collection Query return the expected count?
-
-**Key Insight:** New query code over un-migrated data fails *silently and empty*, not loudly. For single-table DynamoDB, the correct "list a collection" pattern is a sparse GSI (not a separate table) — but shipping the Query before its backfill turns a good design into a phantom data-loss incident.
+**Key Insight:** Know all your access patterns before you design a single-table DynamoDB schema. A collection read that requires a Scan — or a core listing index you have to retrofit and backfill — is a design smell: that pattern should have been keyed in from the start, with its GSI key written at write time.
