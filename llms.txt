@@ -75,3 +75,6 @@
 
 - [Testing spot interruptions without waiting for real events](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/spot-001.md): Invoke the handler Lambda directly with a synthetic payload — EventBridge blocks aws.* source PutEvents.
 - [Handler needs the same env vars as the creation Lambda](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/spot-002.md): If the interruption handler auto-replaces instances, it needs the same broad environment variables as the server-creation Lambda.
+
+## DynamoDB
+- [Design single-table access patterns up front](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/dynamodb-001-53.md): Single-table DynamoDB is access-pattern-first — model every read (including "list all X") and provision its GSI with the key stamped at write time; a listing that needs a Scan or a retrofitted+backfilled index is a design smell.
