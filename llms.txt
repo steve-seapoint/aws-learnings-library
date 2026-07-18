@@ -47,6 +47,7 @@
 - [Stack deletion requires the same permissions as creation](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/cfn-005.md): DELETE_FAILED leaves orphaned billing resources; the caller role needs delete permissions plus extras like DescribeScalingActivities.
 - [Templates over 51,200 bytes require S3 upload](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/cfn-006.md): Templates above the inline limit must deploy via S3 — add --s3-bucket and --s3-prefix to aws cloudformation deploy.
 - [Deploy the API Gateway stack before the Lambdas stack](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/cfn-007.md): The lambdas stack imports API Gateway resource IDs, so deploy the api-gateway stack first.
+- [Description field has a 1024-character limit](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/cfn-008-28.md): A template Description over 1024 chars is rejected at CreateChangeSet with "Template format error", so the stack is never created — move detail to comments and keep Description short.
 
 ## Secrets Management
 
