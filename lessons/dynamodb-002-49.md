@@ -1,6 +1,6 @@
 ---
 id: dynamodb-002-49
-title: "Single-table design" is a misnomer — co-locate only for item collections
+title: Single-table design is a misnomer — co-locate only for item collections
 services: [DynamoDB]
 summary: The only thing that justifies putting two items in one DynamoDB table is retrieving them together (an item collection via Query, or a Scan). Unrelated, independently-accessed data (sessions, telemetry, locks) belongs in its own table — table count is not a cost or design axis, and forcing everything into one table imposes one Streams/backup/capacity config on all of it, bloats items, and widens blast radius.
 ---
