@@ -77,6 +77,10 @@
 - [A crashing Lambda can bypass the DLQ](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/sqs-002-29.md): An OOM/hard-crash replays the same SQS delivery in place (same RequestId) without incrementing ApproximateReceiveCount, so maxReceiveCount never trips and the poison message loops forever instead of dead-lettering.
 - [A silently-succeeding Lambda can also bypass the DLQ](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/sqs-003-06.md): When a Lambda catches an internal failure (e.g. LLM response truncation) and returns success anyway, SQS deletes the message as processed — the retry budget burns on doomed attempts with no error signal and no early DLQ delivery.
 
+## SNS
+
+- [Adding a topic policy disables implicit same-account publish](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/sns-001-32.md): An SNS topic allows same-account publish implicitly only until it has a resource policy; attaching one (e.g. via an EventBridge target) makes CloudWatch alarm actions fail with SNS:Publish AccessDenied unless every publisher is granted explicitly.
+
 ## Spot Interruptions
 
 - [Testing spot interruptions without waiting for real events](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/spot-001.md): Invoke the handler Lambda directly with a synthetic payload — EventBridge blocks aws.* source PutEvents.
