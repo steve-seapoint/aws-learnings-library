@@ -48,6 +48,9 @@
 - [Templates over 51,200 bytes require S3 upload](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/cfn-006.md): Templates above the inline limit must deploy via S3 — add --s3-bucket and --s3-prefix to aws cloudformation deploy.
 - [Deploy the API Gateway stack before the Lambdas stack](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/cfn-007.md): The lambdas stack imports API Gateway resource IDs, so deploy the api-gateway stack first.
 - [Description field has a 1024-character limit](https://raw.githubusercontent.com/jbdamask/aws-learnings-library/main/lessons/cfn-008-28.md): A template Description over 1024 chars is rejected at CreateChangeSet with "Template format error", so the stack is never created — move detail to comments and keep Description short.
+- [Resource signals drop the failure reason](https://raw.githubusercontent.com/steve-seapoint/aws-learnings-library/main/lessons/cfn-009-59.md): cfn-signal --reason is discarded when signalling a CreationPolicy, so a failed boot rolls back with no clue why; signal a WaitConditionHandle instead and the reason appears in stack events.
+- [A completed wait condition never waits again](https://raw.githubusercontent.com/steve-seapoint/aws-learnings-library/main/lessons/cfn-010-59.md): Once a WaitCondition completes it ignores later signals, so a replaced instance is never checked; put a hash of everything that replaces the instance (user data, AMI, type, subnet) in the wait condition's and handle's logical IDs.
+- [Signal a wait condition with curl when cfn-signal is missing](https://raw.githubusercontent.com/steve-seapoint/aws-learnings-library/main/lessons/cfn-011-59.md): If installing aws-cfn-bootstrap fails there is no cfn-signal, so the stack waits out the full timeout with no reason; fall back to curl -X PUT of a JSON body to the handle URL, with an empty Content-Type header.
 
 ## Secrets Management
 
